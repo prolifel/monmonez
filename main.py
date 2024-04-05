@@ -1,28 +1,31 @@
-from pdfquery import PDFQuery
+from typing import Union, Annotated
+from fastapi import FastAPI, File, UploadFile, status, Response
+import models
 
-async def app(scope, receive, send):
-    assert scope['type'] == 'http'
+app = FastAPI()
 
-    pdf = PDFQuery('mar2024.pdf')
-    print(pdf.doc)
-    pdf.load()
 
-    # Use CSS-like selectors to locate the elements
-    text_elements = pdf.pq('LTTextLineHorizontal')
+@app.get("/")
+def read_root():
+    return {"message": "World"}
 
-    # Extract the text from the elements
-    text = [t.text for t in text_elements]
 
-    print(text)
-
-    await send({
-        'type': 'http.response.start',
-        'status': 200,
-        'headers': [
-            [b'content-type', b'text/plain'],
-        ],
+@app.post(
+    "/statements/upload/{type}",
+    status_code=status.HTTP_201_CREATED,
+    response_model=models.Response
+)
+def statement_upload(file: UploadFile, type: str, response: Response) -> models.Response:
+    if type.lower() not in models.STATEMENT_TYPES:
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return models.Response(message="type is invalid", data=[])
+    # return {"filename": file.filename, "type": type}
+    return models.Response(message="success", data={
+        "filename": file.filename,
+        "type": type
     })
-    await send({
-        'type': 'http.response.body',
-        'body': b'Hello, world!',
-    })
+
+
+@app.get("/items/{item_id}")
+def read_item(item_id: int, q: Union[str, None] = None):
+    return {"item_id": item_id, "q": q}
