@@ -1,20 +1,45 @@
-from typing import Union, Annotated, Optional
-from fastapi import FastAPI, File, UploadFile, status, Response, Depends, HTTPException
-from fastapi.security.http import HTTPAuthorizationCredentials, HTTPBearer
-import models
-import util
-import Statement
-import pathlib
-from fastapi.responses import FileResponse
+from functools import lru_cache
 from jose import JWTError, jwt
+from fastapi.responses import FileResponse
+import pathlib
+import Statement
+import util
+import models
+from fastapi.security.http import HTTPAuthorizationCredentials, HTTPBearer
+from fastapi import FastAPI, UploadFile, status, Response, Depends, HTTPException
+from typing import Annotated
+from config import Settings
 
 
-app = FastAPI()
+@lru_cache
+def get_settings():
+    return Settings()
+
+
+config = {}
+
+
+def lifespan(app: FastAPI):
+    try:
+        print("starting lifespan")
+        config["env"] = get_settings()
+        if config["env"].ACCESS_TOKEN_EXPIRE_MINUTES is None or config["env"].ACCESS_TOKEN_EXPIRE_MINUTES == 0 or config["env"].SECRET_KEY is None or config["env"].SECRET_KEY == "" or config["env"].ALGORITHM is None or config["env"].ALGORITHM == "" or config["env"].APP_USER is None or config["env"].APP_USER == "":
+            raise Exception("missing config")
+    except Exception as e:
+        print("An exception occurred:", type(e).__name__, "–", e)
+        exit(1)
+
+    yield
+    print("ending lifespan")
+
+
+# app = FastAPI(dependencies=[Depends(get_settings)])
+app = FastAPI(lifespan=lifespan)
 
 get_bearer_token = HTTPBearer(auto_error=False)
 
 
-def get_token(auth: Optional[HTTPAuthorizationCredentials] = Depends(get_bearer_token)):
+def get_token(settings: Annotated[Settings, Depends(get_settings)], auth: Annotated[HTTPAuthorizationCredentials, Depends(get_bearer_token)]):
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Could not validate credentials",
@@ -25,13 +50,13 @@ def get_token(auth: Optional[HTTPAuthorizationCredentials] = Depends(get_bearer_
         token = auth.credentials
         if token is None:
             raise credentials_exception
-        payload = jwt.decode(token, util.SECRET_KEY,
-                             algorithms=[util.ALGORITHM])
+        payload = jwt.decode(token, settings.SECRET_KEY,
+                             algorithms=[settings.ALGORITHM])
         username: str = payload.get("sub")
         if username is None:
             raise credentials_exception
         token_data = models.TokenData(username=username)
-        if token_data.username is None or token_data.username == "" or token_data.username != util.USERNAME:
+        if token_data.username is None or token_data.username == "" or token_data.username != settings.APP_USER:
             raise credentials_exception
     except (JWTError) as err:
         print(err)
@@ -73,8 +98,3 @@ def statement_upload(token: Annotated[str, Depends(get_token)], file: UploadFile
     #     "filename": file.filename,
     #     "type": type,
     # })
-
-
-@app.get("/items/{item_id}")
-def read_item(item_id: int, q: Union[str, None] = None):
-    return {"item_id": item_id, "q": q}
