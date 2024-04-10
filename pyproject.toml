@@ -1,0 +1,24 @@
+[tool.poetry]
+name = "money-calculate"
+version = "0.1.0"
+description = "convert your estatement to csv"
+authors = ["Clement Prolifel Priyatama <clement.085w@gmail.com>"]
+readme = "README.md"
+package-mode = false
+
+[tool.poetry.dependencies]
+python = "^3.10"
+fastapi = "^0.110.1"
+granian = "^1.2.2"
+numpy = "^1.26.4"
+pandas = "^2.2.1"
+pydantic = "^2.6.4"
+pydantic-config = "^0.3.0"
+python-dateutil = "^2.9.0"
+python-jose = "^3.3.0"
+multipart = "^0.2.4"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
